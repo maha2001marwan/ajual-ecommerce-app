@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "434690074956",
+    "project_id": "ajual-95ae8",
+    "storage_bucket": "ajual-95ae8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:434690074956:android:5016264a431b94962c47e9",
+        "android_client_info": {
+          "package_name": "com.example.ajual"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "434690074956-u3gmc91lb86tc83bv79j9okl264uj4a6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ajual",
+            "certificate_hash": "0b1a6b350fedbccdc3f6e178b05d115f826eac8e"
+          }
+        },
+        {
+          "client_id": "434690074956-mj5uncla85eddt3bs79t0kric5pnb0u3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAN74BMO0jKnwg6_6NEqLAJp5smUvzotRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "434690074956-mj5uncla85eddt3bs79t0kric5pnb0u3.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "434690074956-djl9qgrjhf6b31edo2l4ol9fjuf4a0v7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.ajual"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

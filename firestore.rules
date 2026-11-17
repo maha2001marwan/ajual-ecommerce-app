@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// Firestore rules for the free Spark plan: the client writes orders,
+// notifications and reviews itself, so every write is validated here.
+// Deploy with:  firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function data() { return request.resource.data; }
+    function changed() { return data().diff(resource.data).affectedKeys(); }
+
+    // The catalogue can be (re)seeded by the app only while appConfig/seed is
+    // missing or older than the app's catalogVersion (7). After that it is
+    // read-only for clients; admins (custom claim admin: true) can still edit.
+    // Keep this number equal to AppConfig.catalogVersion.
+    function seedPath() { return /databases/$(database)/documents/appConfig/seed; }
+    function catalogUnlocked() {
+      return signedIn() && (!exists(seedPath()) || get(seedPath()).data.version < 7);
+    }
+
+    match /appConfig/{doc} {
+      allow read: if signedIn();
+      allow write: if (doc == 'seed' && catalogUnlocked()) || isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if signedIn();
+      allow write: if catalogUnlocked() || isAdmin();
+
+      // One review per user, document id = uid.
+      match /reviews/{uid} {
+        allow read: if signedIn();
+        allow create, update: if isOwner(uid)
+          && data().userId == uid
+          && data().productId == productId
+          && data().rating is number && data().rating >= 1 && data().rating <= 5
+          && data().body is string && data().body.size() <= 600
+          && data().name is string && data().name.size() <= 80;
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    match /categories/{id} {
+      allow read: if signedIn();
+      allow write: if catalogUnlocked() || isAdmin();
+    }
+
+    match /coupons/{code} {
+      allow read: if signedIn();
+      allow write: if catalogUnlocked() || isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && data().uid == uid;
+      allow update: if isOwner(uid) && !changed().hasAny(['uid']);
+      allow delete: if isOwner(uid);
+
+      match /favorites/{id}      { allow read, write: if isOwner(uid); }
+      match /cart/{id}           { allow read, write: if isOwner(uid); }
+      match /addresses/{id}      { allow read, write: if isOwner(uid); }
+      match /deviceTokens/{id}   { allow read, write: if isOwner(uid); }
+      match /reviews/{productId} { allow read, write: if isOwner(uid); }
+
+      // Saved cards: never a full number or a CVV.
+      match /cards/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && data().last4 is string && data().last4.size() == 4
+          && !data().keys().hasAny(['number', 'cardNumber', 'cvv', 'cvc', 'pan']);
+      }
+
+      match /notifications/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid) && data().read == false;
+        allow update: if isOwner(uid) && changed().hasOnly(['read', 'readAt']);
+      }
+
+      match /orders/{orderId} {
+        function validTransition(from, to) {
+          return (from == 'pending'   && to in ['confirmed', 'cancelled'])
+              || (from == 'confirmed' && to in ['shipped', 'cancelled'])
+              || (from == 'shipped'   && to == 'delivered')
+              || (from == 'delivered' && to == 'return_requested');
+        }
+
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isOwner(uid)
+          && data().status == 'pending'
+          && data().items is list && data().items.size() > 0 && data().items.size() <= 50
+          && data().total is number && data().total >= 0
+          && data().subtotal is number && data().subtotal >= 0
+          && data().paymentMethod in ['cash_on_delivery', 'card', 'paypal'];
+        // Customers can cancel / request a return; the demo simulator advances
+        // ongoing orders. With Cloud Functions (Blaze) restrict this to admins.
+        allow update: if isAdmin() || (isOwner(uid)
+          && changed().hasOnly(['status', 'events', 'updatedAt', 'shippedAt', 'paymentStatus'])
+          && validTransition(resource.data.status, data().status));
+        allow delete: if false;
+      }
+    }
+  }
+}
